@@ -1,7 +1,7 @@
 """
 Module to create Classes
 """
-from metadata import EntitySet, Singleton, EnumType, ComplexType, EntityType
+from metadata import EntitySet, Singleton, EnumType, ComplexType, EntityType, Metadata
 from string import Template
 import logging
 
@@ -214,27 +214,32 @@ class $class_name($super_class_name):"""
         str_class = Template(str_class).substitute(dic_values)
         return str_class
 
-    def create_class(self, name, schema_type):
+    def create_class(self, name, schema):
+
+        def save_class(filename, text):
+            with open("model/" + filename + ".py", 'w') as f:
+                f.write(text)
+
         print(name)
-        print(schema_type)
+        print(schema)
 
-        if isinstance(schema_type, EnumType):
-            str_class = self.create_enumtype(name, schema_type)
+        if isinstance(schema, EnumType):
+            str_class = self.create_enumtype(name, schema)
 
-        elif isinstance(schema_type, EntityType):
-            str_class = self.create_entitytype(name, schema_type)
+        elif isinstance(schema, EntityType):
+            str_class = self.create_entitytype(name, schema)
 
-        elif isinstance(schema_type, ComplexType):
-            str_class = self.create_complextype(name, schema_type)
+        elif isinstance(schema, ComplexType):
+            str_class = self.create_complextype(name, schema)
 
         else:
             logging.warning("Class " + name + " is not a known EDM type.")
+            return
 
-        self.save_class(name, str_class)
+        module_name = Metadata.camel_to_lowercase(name)
+        save_class(module_name, str_class)
 
-    def save_class(self, name, text):
-        with open("model/" + name + ".py", 'w') as f:
-            f.write(text)
+
 
 
 

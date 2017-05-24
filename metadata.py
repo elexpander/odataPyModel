@@ -284,9 +284,7 @@ class Metadata(object):
             :param name: string with name in thisFormat
             :return: string with name in this_format
             """
-            if name[0].isupper():
-                name = name[0].lower() + name[1:]
-
+            name = name[0].lower() + name[1:]
             name = ''.join(["_" + c.lower() if c.isupper() else c for c in name])
 
             while iskeyword(name):
@@ -560,3 +558,19 @@ class Metadata(object):
             else:
                 logging.info("Function {name} not supported, no bindingParameter found.".
                              format(name=function_name))
+
+    @staticmethod
+    def camel_to_lowercase(name):
+        """
+        Convert camel case name into lower case and words separated by underscores
+        :param name: string with name in thisFormat
+        :return: string with name in this_format
+        """
+        name = name[0].lower() + name[1:]
+        name = ''.join(["_" + c.lower() if c.isupper() else c for c in name])
+
+        while iskeyword(name):
+            name = "_" + name
+
+        return name
+
