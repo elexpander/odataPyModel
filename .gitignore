@@ -1,14 +1,16 @@
+
+# Files created by app
 metadata.xml
 model/*
 model*.json
+
+# PyCharm files
+.idea
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
-*.so
 
 # Distribution / packaging
 .Python
@@ -48,10 +50,6 @@ nosetests.xml
 coverage.xml
 *,cover
 .hypothesis/
-
-# Translations
-*.mo
-*.pot
 
 # Django stuff:
 *.log
