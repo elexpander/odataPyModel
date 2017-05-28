@@ -6,14 +6,6 @@ import re
 from keyword import iskeyword
 
 
-class Guid(str):
-    def __new__(cls, value):
-        if re.fullmatch("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", value):
-            return str.__new__(cls, value)
-        else:
-            raise ValueError("String doesn't look like a GUID.")
-
-
 class OdataFunction(dict):
     def __init__(self,
                  returns=None,
@@ -231,10 +223,10 @@ class Metadata(object):
                           'Edm.Single': 'float',
                           'Edm.Double': 'float',
                           'Edm.Boolean': 'bool',
-                          'Edm.TimeOfDay': 'datetime.time',
-                          'Edm.Date': 'datetime.date',
-                          'Edm.DateTimeOffset': 'datetime.datetime',
-                          'Edm.Duration': 'datetime.timedelta',
+                          'Edm.TimeOfDay': 'time',
+                          'Edm.Date': 'date',
+                          'Edm.DateTimeOffset': 'datetime',
+                          'Edm.Duration': 'timedelta',
                           'Edm.Guid': 'Guid',
                           'Edm.Stream': 'bytes',
                           'Edm.Binary': 'bytes'}
@@ -374,7 +366,7 @@ class Metadata(object):
 
             # Get type name
             odata_type_name = e_type.attrib['Name']
-            python_type_name = pythonize_type(odata_type_name)
+            type_name = pythonize_type(odata_type_name)
 
             # Get values
             values = []
@@ -382,8 +374,8 @@ class Metadata(object):
                 values.append(e_attrib.attrib['Name'])
 
             # Add type to schema dictionary
-            self.classes[python_type_name] = EnumType(odata_name=odata_type_name, values=values)
-            self.edm_types[add_namespace_to_tag(odata_type_name)] = python_type_name
+            self.classes[type_name] = EnumType(odata_name=odata_type_name, values=values)
+            self.edm_types[add_namespace_to_tag(odata_type_name)] = type_name
 
         # Process EntityType
         for e_type in schema.findall(add_xmlns_to_tag('EntityType')):
@@ -439,7 +431,7 @@ class Metadata(object):
 
             # Add entity_type to graph_type dictionary
             self.classes[type_name] = entity_type
-            self.edm_types[add_namespace_to_tag(odata_type_name)] = python_type_name
+            self.edm_types[add_namespace_to_tag(odata_type_name)] = type_name
 
         # Process ComplexType
         for e_type in schema.findall(add_xmlns_to_tag('ComplexType')):
@@ -478,7 +470,7 @@ class Metadata(object):
 
             # Add type to schema dictionary
             self.classes[type_name] = complex_type
-            self.edm_types[add_namespace_to_tag(odata_type_name)] = python_type_name
+            self.edm_types[add_namespace_to_tag(odata_type_name)] = type_name
 
         # Process Actions
         for e_type in schema.findall(add_xmlns_to_tag('Action')):
@@ -573,4 +565,3 @@ class Metadata(object):
             name = "_" + name
 
         return name
-

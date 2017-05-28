@@ -1,7 +1,7 @@
 
 # Files created by app
 metadata.xml
-model/*
+output/*
 model*.json
 
 # PyCharm files

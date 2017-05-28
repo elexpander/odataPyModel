@@ -91,25 +91,28 @@ class GraphModel(object):
         for name, graph_class in metadata.classes.items():
 
             if isinstance(graph_class, EntityType):
-                factory.create_class(name, graph_class)
-                if name == 'GraphUser':
-                    break
+                factory.add_entitytype(name, graph_class)
 
             elif isinstance(graph_class, ComplexType):
-                factory.create_class(name, graph_class)
+                factory.add_complextype(name, graph_class)
 
-                break
-            """ 
-            if isinstance(graph_type, EntityType) and graph_type.base:
-                base_class = GraphModel.graph_classes[graph_type.base]
+            elif isinstance(graph_class, EnumType):
+                factory.add_enumtype(name, graph_class)
+
             else:
-                base_class = GraphObjectBase
+                logging.warning("Class " + name + " is not a known EDM type.")
 
-            if isinstance(graph_type, EntityType) or isinstance(graph_type, ComplexType):
-                GraphModel.graph_classes[name] = self._create_class(name,
-                                                                    property_list=list(graph_type.properties.keys()),
-                                                                    base_class=base_class)
-            """
+        for name, graph_set in metadata.sets.items():
+            if isinstance(graph_set, EntitySet):
+                factory.add_entityset(name, graph_set)
+
+            elif isinstance(graph_set, Singleton):
+                factory.add_singleton(name, graph_set)
+
+            else:
+                logging.warning("Class " + name + " is not a known EDM type.")
+
+        factory.save()
 
     @staticmethod
     def get_python_tag(tag, context=None):
