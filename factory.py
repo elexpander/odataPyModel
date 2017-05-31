@@ -14,9 +14,12 @@ AUXILIARY_FILE = "auxiliary.py"
 
 class ClassFactory(object):
 
-    def __init__(self):
-
+    def __init__(self, odata_types):
+        self.odata_types = odata_types
+        self.odata_containers = {}
+        self.odata_properties = {}
         self.classes = {}
+
 
     ######################################################################
 
@@ -48,12 +51,21 @@ class $class_name(str):
     ######################################################################
 
     def add_complextype(self, name, schema):
+
+        d_prop = {}
+        for k, v in {np.odata_name: np.odata_type for np in schema.navigation_properties.values()}.items():
+            d_prop[k] = v.replace("Collection(", "").rstrip(')')
+        for k, v in {np.odata_name: np.odata_type for np in schema.properties.values()}.items():
+            d_prop[k] = v.replace("Collection(", "").rstrip(')')
+        self.odata_properties[schema['odata_name']] = d_prop
+
         imports = [self.get_import_line(BASE_CLASS)]
 
         odata_properties = {value['odata_name']: key for (key, value) in schema.properties.items()}
 
-        attributes = "# Properties\n        "
+        attributes = "# Properties\n"
         for p_name, p_item in schema.properties.items():
+            attributes += "        self." + p_name + " = "
 
             # Find out if it's a list and get the type
             if p_item['python_type'].startswith('*'):
@@ -62,10 +74,6 @@ class $class_name(str):
             else:
                 is_list = False
                 p_type = p_item['python_type']
-
-            if p_type == "bool":
-                # Function to cast str to bool
-                p_type = "s2b"
 
             # Collect necessary imports
             import_line = self.get_import_line(p_type)
@@ -77,17 +85,8 @@ class $class_name(str):
             else:
                 attributes += p_type + "(properties['" + p_name + "'])"
 
-            attributes += " if '" + p_name + "' in properties else None\n        "
-        '''
-        attributes += "\n        # Navigation Properties\n        "
-        for p_name, p_item in schema.navigation_properties.items():
-            attributes += "self." + p_name + " = "
-            if p_item['python_type'].startswith('*'):
-                attributes += "[" + p_item['python_type'][1:] + "(prop) for prop in properties['" + p_name + "']]"
-            else:
-                attributes += p_item['python_type'] + "(properties['" + p_name + "'])"
-            attributes += " if '" + p_name + "' in properties else None\n            "
-        '''
+            attributes += " if '" + p_name + "' in properties else None\n"
+
         str_class = '''$license
 $imports
 
@@ -98,26 +97,18 @@ class $class_name($base_class_name):
     valid_odata_properties = $odata_properties
     valid_properties = $python_properties
     
-    def __init__(self, properties=None, odata_properties=None):
+    def __init__(self, odata_properties):
         """Initialization of $odata_name instance
-        Must call with at least one of the 2 available parameters.
-        :param properties: dictionary of properties with their values.
         :param odata_properties: dictionary of properties in their original odata name
                                  with their values.
-        """
-        
-        if odata_properties:
-            # Convert properties' names to python format
-            properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
-                          if key in $class_name.valid_odata_properties}
-            
-        if not properties:
-            raise ValueError("Missing properties.")
-            
+        """  
         super().__init__()
-
-        $attributes
 '''
+        str_class += '''        # Convert properties' names to python format
+        properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
+                      if key in $class_name.valid_odata_properties}'''
+        str_class += "\n        $attributes"
+
         str_imports = "".join([line + "\n" for line in imports if isinstance(line, str)])
 
         dic_values = {'class_name': name,
@@ -156,7 +147,8 @@ class $class_name($base_class_name):
     ######################################################################
 
     def add_entityset(self, name, schema):
-        pass
+        self.odata_containers[schema.odata_name] = schema.odata_entity_type.lstrip('*')
+
     '''
     < EntitySet    Name = "users"    EntityType = "microsoft.graph.user" >
     < NavigationPropertyBinding    Path = "ownedDevices"    Target = "directoryObjects" / >
@@ -172,17 +164,14 @@ class $class_name($base_class_name):
     '''
 
     def add_singleton(self, name, schema):
-        pass
+        self.odata_containers[schema.odata_name] = schema.odata_entity_type.lstrip('*')
 
     ######################################################################
 
     def get_import_line(self, object_type):
         """Returns string with import line for the type."""
-        if object_type in ("str", "int", "float", "bytes"):
+        if object_type in ("str", "int", "float", "bool", "bytes"):
             output = None
-
-        elif object_type == "s2b":
-            output = "from .auxiliary import s2b"
 
         elif object_type in ("time", "date", "datetime", "timedelta"):
             output = "from datetime import " + object_type
@@ -200,14 +189,21 @@ class $class_name($base_class_name):
 
     def add_entitytype(self, name, schema):
 
+        d_prop = {}
+        for k, v in {np.odata_name: np.odata_type for np in schema.navigation_properties.values()}.items():
+            d_prop[k] = v.replace("Collection(", "").rstrip(')')
+        for k, v in {np.odata_name: np.odata_type for np in schema.properties.values()}.items():
+            d_prop[k] = v.replace("Collection(", "").rstrip(')')
+        self.odata_properties[schema['odata_name']] = d_prop
+
         base_class_name = schema.base if schema.base else BASE_CLASS
         imports = [self.get_import_line(base_class_name)]
 
         odata_properties = {value['odata_name']: key for (key, value) in schema.properties.items()}
 
-        attributes = "# Properties\n        "
+        attributes = "# Properties\n"
         for p_name, p_item in schema.properties.items():
-            attributes += "self." + p_name + " = "
+            attributes += "        self." + p_name + " = "
 
             # Find out if it's a list and get the type
             if p_item['python_type'].startswith('*'):
@@ -216,10 +212,6 @@ class $class_name($base_class_name):
             else:
                 is_list = False
                 p_type = p_item['python_type']
-
-            if p_type == "bool":
-                # Function to cast str to bool
-                p_type = "s2b"
 
             # Collect necessary imports
             import_line = self.get_import_line(p_type)
@@ -231,18 +223,8 @@ class $class_name($base_class_name):
             else:
                 attributes += p_type + "(properties['" + p_name + "'])"
 
-            attributes += " if '" + p_name + "' in properties else None\n        "
+            attributes += " if '" + p_name + "' in properties else None\n"
 
-        '''
-        attributes += "\n        # Navigation Properties\n        "
-        for p_name, p_item in schema.navigation_properties.items():
-            attributes += "self." + p_name + " = "
-            if p_item['python_type'].startswith('*'):
-                attributes += "[" + p_item['python_type'][1:] + "(prop) for prop in properties['" + p_name + "']]"
-            else:
-                attributes += p_item['python_type'] + "(properties['" + p_name + "'])"
-            attributes += " if '" + p_name + "' in properties else None\n        "
-        '''
         str_class = '''$license
 $imports
 
@@ -253,28 +235,22 @@ class $class_name($base_class_name):
     valid_odata_properties = $odata_properties
     valid_properties = $python_properties
 
-    def __init__(self, properties=None, odata_properties=None):
+    def __init__(self, odata_properties):
         """Initialization of $odata_name instance
-        Must call with at least one of the 2 available parameters.
-        :param properties: dictionary of properties with their values.
         :param odata_properties: dictionary of properties in their original odata name
                                  with their values.
         """
-        
-        if odata_properties:
-            # Convert properties' names to python format
-            properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
-                          if key in $class_name.valid_odata_properties}
-            
-        if not properties:
-            raise ValueError("Missing properties.")
-
 '''
         str_imports = "".join([line + "\n" for line in imports if isinstance(line, str)])
 
         if base_class_name != BASE_CLASS:
-            str_class += '''        super().__init__(properties)\n\n'''
-        str_class += '''        $attributes\n\n'''
+            str_class += '''        super().__init__(odata_properties)\n\n'''
+
+        str_class += '''        # Convert properties' names to python format
+        properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
+                      if key in $class_name.valid_odata_properties}\n'''
+
+        str_class += '''\n        $attributes\n\n'''
 
         dic_values = {'class_name': name,
                       'base_class_name': base_class_name,
@@ -292,20 +268,42 @@ class $class_name($base_class_name):
     def save(self):
         str_package = '"""Package with all classes representing data model."""\n\n'
 
+        # object classes files
         for class_name, str_class in self.classes.items():
             file_name = Metadata.camel_to_lowercase(class_name)
             str_package += "from ." + file_name + " import " + class_name + "\n"
             with open(OUTPUT_PATH + "/" + file_name + ".py", 'w') as f:
                 f.write(str_class)
 
+        # __init__.py
         with open(OUTPUT_PATH + "/__init__.py", 'w') as f:
             f.write(str_package)
 
+        # object base file
         base_class_file = Metadata.camel_to_lowercase(BASE_CLASS) + ".py"
         copyfile(INPUT_PATH + "/" + base_class_file, OUTPUT_PATH + "/" + base_class_file)
+
+        # auxiliary file
         copyfile(INPUT_PATH + "/" + AUXILIARY_FILE, OUTPUT_PATH + "/" + AUXILIARY_FILE)
+        with open(OUTPUT_PATH + "/" + AUXILIARY_FILE, 'a') as f:
 
+            f.write("ODATA_CONTAINER_TYPE = {")
+            for k, v in self.odata_containers.items():
+                f.write("'" + k + "': '" + v + "',\n                        ")
+            f.write("}\n\n")
 
+            f.write("ODATA_TYPE_TO_PYTHON = {")
+            for k, v in self.odata_types.items():
+                f.write("'" + k + "': '" + v + "',\n                        ")
+            f.write("}\n\n")
+
+            f.write("ODATA_PROPERTY_TYPE = {")
+            for obj, d in self.odata_properties.items():
+                f.write("'" + obj + "': {\n")
+                for p, t in d.items():
+                    f.write("                           '" + p + "': '" + t + "',\n")
+                f.write("                           },\n                       ")
+            f.write("}\n\n")
 
 
 

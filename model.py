@@ -5,7 +5,6 @@
 
 from metadata import *
 from factory import ClassFactory
-from os.path import isfile
 import json
 
 
@@ -36,57 +35,21 @@ class GraphModel(object):
         metadata = Metadata(metadata_url)
 
         # Save model to json file for review
-        #if not isfile(model_file):
         with open(model_file, 'w') as f:
             json.dump(metadata.classes, f, indent=4)
 
-        # if not isfile(model_file):
         with open("model_sets.json", 'w') as f:
             json.dump(metadata.sets, f, indent=4)
 
-        # if not isfile(model_file):
         with open("model_udm.json", 'w') as f:
-            json.dump(metadata.edm_types, f, indent=4)
+            json.dump(metadata.odata_types, f, indent=4)
 
-        self._load_classes(metadata)
+        self.load_classes(metadata)
 
-    @staticmethod
-    def get_class(name):
-        return GraphModel.graph_classes[name]
-
-    def _create_class(self,
-                      name,
-                      property_list,
-                      navigation_property_list=None,
-                      action_list=None,
-                      function_list=None,
-                      base_class=GraphObjectBase):
-
-        def f__init__(self, properties):
-            """
-            Initialize instance of class
-            :param self: 
-            :param properties: dictionary with properties (name: value)
-                               Properties may be other objects with their own properties
-            :return: instance of class
-            """
-            if not base_class == GraphObjectBase:
-                base_class.__init__(self, properties)
-
-            for p_name, p_value in properties.items():
-                if not p_name.startswith('@') and p_name in property_list:
-                    setattr(self, p_name, p_value)
-
-            """TypeError: Argument id not valid for GraphDirectoryRole
-                hay que dar soporte de herencia
-            """
-        new_class = type(name, (base_class,), {"__init__": f__init__})
-        return new_class
-
-    def _load_classes(self, metadata):
+    def load_classes(self, metadata):
         """Return dictionary with all Graph Classes
         """
-        factory = ClassFactory()
+        factory = ClassFactory(metadata.odata_types)
 
         for name, graph_class in metadata.classes.items():
 
@@ -103,11 +66,11 @@ class GraphModel(object):
                 logging.warning("Class " + name + " is not a known EDM type.")
 
         for name, graph_set in metadata.sets.items():
-            if isinstance(graph_set, EntitySet):
-                factory.add_entityset(name, graph_set)
-
-            elif isinstance(graph_set, Singleton):
+            if isinstance(graph_set, Singleton):
                 factory.add_singleton(name, graph_set)
+
+            elif isinstance(graph_set, EntitySet):
+                factory.add_entityset(name, graph_set)
 
             else:
                 logging.warning("Class " + name + " is not a known EDM type.")

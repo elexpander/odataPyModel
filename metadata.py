@@ -2,7 +2,6 @@ import xml.etree.ElementTree as ET
 from urllib.request import urlretrieve
 from os.path import isfile
 import logging
-import re
 from keyword import iskeyword
 
 
@@ -71,6 +70,10 @@ class EntitySet(EdmType):
         self['entity_type'] = entity_type
         self['odata_entity_type'] = odata_entity_type
         self['navigation_properties'] = navigation_properties
+
+    @property
+    def odata_entity_type(self):
+        return self['odata_entity_type']
 
 
 class Singleton(EntitySet):
@@ -214,7 +217,8 @@ class Metadata(object):
         self.class_prefix = 'Graph'
         self.sets = {}
         self.classes = {}
-        self.edm_types = {'Edm.String': 'str',
+        self.odata_containers = {}
+        self.odata_types = {'Edm.String': 'str',
                           'Edm.SByte': 'int',
                           'Edm.Int16': 'int',
                           'Edm.Int32': 'int',
@@ -223,10 +227,10 @@ class Metadata(object):
                           'Edm.Single': 'float',
                           'Edm.Double': 'float',
                           'Edm.Boolean': 'bool',
-                          'Edm.TimeOfDay': 'time',
-                          'Edm.Date': 'date',
-                          'Edm.DateTimeOffset': 'datetime',
-                          'Edm.Duration': 'timedelta',
+                          'Edm.TimeOfDay': 'str',
+                          'Edm.Date': 'str',
+                          'Edm.DateTimeOffset': 'str',
+                          'Edm.Duration': 'str',
                           'Edm.Guid': 'Guid',
                           'Edm.Stream': 'bytes',
                           'Edm.Binary': 'bytes'}
@@ -262,7 +266,7 @@ class Metadata(object):
 
             elif name.startswith('Edm.'):
                 # convert edm type to python
-                name = self.edm_types[name]
+                name = self.odata_types[name]
             else:
                 name = self.class_prefix + name[0].upper() + name[1:]
 
@@ -333,6 +337,7 @@ class Metadata(object):
 
             # Add entityset to graph_type dictionary
             self.sets[entityset_name] = entityset
+            self.odata_containers[entityset_name] = "*" + entityset_type
 
         # Process Singleton
         for e_singleton in entity_container.findall(add_xmlns_to_tag('Singleton')):
@@ -360,13 +365,14 @@ class Metadata(object):
 
             # Add singleton to dictionary
             self.sets[singleton_name] = singleton
+            self.odata_containers[singleton_name] = singleton_type
 
-        # Process EnumType - https://docs.python.org/3/library/enum.html
+        # Process EnumType
         for e_type in schema.findall(add_xmlns_to_tag('EnumType')):
 
             # Get type name
-            odata_type_name = e_type.attrib['Name']
-            type_name = pythonize_type(odata_type_name)
+            odata_type_name = add_namespace_to_tag(e_type.attrib['Name'])
+            type_name = pythonize_type(e_type.attrib['Name'])
 
             # Get values
             values = []
@@ -375,14 +381,14 @@ class Metadata(object):
 
             # Add type to schema dictionary
             self.classes[type_name] = EnumType(odata_name=odata_type_name, values=values)
-            self.edm_types[add_namespace_to_tag(odata_type_name)] = type_name
+            self.odata_types[odata_type_name] = type_name
 
         # Process EntityType
         for e_type in schema.findall(add_xmlns_to_tag('EntityType')):
 
             # Get type name
-            odata_type_name = e_type.attrib['Name']
-            type_name = pythonize_type(odata_type_name)
+            odata_type_name = add_namespace_to_tag(e_type.attrib['Name'])
+            type_name = pythonize_type(e_type.attrib['Name'])
 
             # Get key if it exists
             try:
@@ -431,14 +437,14 @@ class Metadata(object):
 
             # Add entity_type to graph_type dictionary
             self.classes[type_name] = entity_type
-            self.edm_types[add_namespace_to_tag(odata_type_name)] = type_name
+            self.odata_types[odata_type_name] = type_name
 
         # Process ComplexType
         for e_type in schema.findall(add_xmlns_to_tag('ComplexType')):
 
             # Get type name
-            odata_type_name = e_type.attrib['Name']
-            type_name = pythonize_type(odata_type_name)
+            odata_type_name = add_namespace_to_tag(e_type.attrib['Name'])
+            type_name = pythonize_type(e_type.attrib['Name'])
 
             # Get type properties
             properties = {}
@@ -470,7 +476,7 @@ class Metadata(object):
 
             # Add type to schema dictionary
             self.classes[type_name] = complex_type
-            self.edm_types[add_namespace_to_tag(odata_type_name)] = type_name
+            self.odata_types[odata_type_name] = type_name
 
         # Process Actions
         for e_type in schema.findall(add_xmlns_to_tag('Action')):
@@ -486,7 +492,7 @@ class Metadata(object):
                     parameters[pythonize_attribute(e_attrib.attrib['Name'])] = pythonize_type(e_attrib.attrib['Type'])
 
             if binding:
-                if binding.startswith('*'):
+                if binding.startswith("*"):
                     logging.info("Action {action} not supported, it binds to collection {binding}.".
                                  format(action=action_name, binding=binding))
                     continue
@@ -525,7 +531,7 @@ class Metadata(object):
                     parameters[e_attrib.attrib['Name']] = pythonize_type(e_attrib.attrib['Type'])
 
             if binding:
-                if binding.startswith('*'):
+                if binding.startswith("*"):
                     logging.info("Function {name} not supported, it binds to collection {binding}.".
                                  format(name=function_name, binding=binding))
                     continue
