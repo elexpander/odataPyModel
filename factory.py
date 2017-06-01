@@ -177,7 +177,7 @@ class $class_name($base_class_name):
             output = "from datetime import " + object_type
 
         elif object_type == "Guid":
-            output = "from .auxiliary import Guid"
+            output = "from .object_base import Guid"
 
         else:
             type_file = Metadata.camel_to_lowercase(object_type)
@@ -294,7 +294,7 @@ class $class_name($base_class_name):
 
             f.write("ODATA_TYPE_TO_PYTHON = {")
             for k, v in self.odata_types.items():
-                f.write("'" + k + "': '" + v + "',\n                        ")
+                f.write("'" + k + "': " + v + ",\n                        ")
             f.write("}\n\n")
 
             f.write("ODATA_PROPERTY_TYPE = {")

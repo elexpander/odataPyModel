@@ -1,10 +1,11 @@
 """Auxiliary classes and functions to support the model"""
 
-from re import fullmatch, search, match
-from datetime import datetime, date, time
+from re import match
+from .object_base import *
+from .. import *
 
 
-def detect_object_type(self, odata_context, odata_type=None):
+def get_object_class(odata_context, odata_type=None):
     """Returns class corresponding to the odata context and type specified by parameters.
     :param odata_context: odata context.
     :param odata_type: odata type. Optional.
@@ -84,59 +85,5 @@ def detect_object_type(self, odata_context, odata_type=None):
 
     # It must be something we didn't think about
     raise ValueError("Unknown odata context: " + odata_context)
-
-
-class Guid(str):
-    """Object represents a GUID which is a string."""
-    def __new__(cls, value):
-        if fullmatch("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", value):
-            return str.__new__(cls, value)
-        else:
-            raise ValueError("String doesn't look like a GUID.")
-
-
-class Date(date):
-    """Representation of a date without time."""
-    def __init__(self, value):
-        """Initializes the date object.
-        :param value: String representation of date in YYYY-MM-DD format.
-        :return: date object."""
-        m = search(r"(?P<year>[0-9]{4})-(?P<month>[0-9]{2})-(?P<day>[0-9]{2})", value)
-        if not m:
-            raise ValueError("Incorrect date format.")
-        year = int(m.group('year'))
-        month = int(m.group('month'))
-        day = int(m.group('day'))
-        self = date(year, month, day)
-
-
-class Time(time):
-    """Representation of a time of day. Optionally it can have seconds and fractional seconds.
-    :param value: String representation of time in HH:MM[:SS[.microseconds]] format.
-    :return: time object."""
-    def __init__(self, value):
-        m = search(r"(?P<hour>[0-9]{4}):(?P<min>[0-9]{2})(:(?P<sec>[0-9]{2})(.(?P<ms>[0-9]{0,6}))?)?", value)
-        if not m:
-            raise ValueError("Incorrect time format.")
-
-        hour = int(m.group('hour'))
-        min = int(m.group('min'))
-        sec = int(m.group('sec')) if m.group('sec') else 0
-        ms = int(m.group('ms')) if m.group('ms') else 0
-
-        self = time(hour, min, sec, ms)
-
-
-class DateTime(datetime):
-    """Representation of a full date with time."""
-    def __init__(self, value):
-        m = search(r"((?P<zulu>Z)|(?P<tz>[+-][0-9]{2}:[0-9]{2}))", value)
-        if not m:
-            raise ValueError("Incorrect datetime format.")
-
-        d = Date(value)
-        t = Time(value)
-
-        self = datetime.combine(d, t)
 
 
