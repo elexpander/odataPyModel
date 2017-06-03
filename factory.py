@@ -6,10 +6,10 @@ from string import Template
 from shutil import copyfile
 
 
-BASE_CLASS = "ObjectBase"
+BASE_CLASS = "OdataObjectBase"
 INPUT_PATH = "input"
 OUTPUT_PATH = "output"
-AUXILIARY_FILE = "auxiliary.py"
+EXTENSION_FILE = "extension.py"
 
 
 class ClassFactory(object):
@@ -85,7 +85,7 @@ class $class_name(str):
             else:
                 attributes += p_type + "(properties['" + p_name + "'])"
 
-            attributes += " if '" + p_name + "' in properties else None\n"
+            attributes += " \\\n            if '" + p_name + "' in properties and properties['" + p_name + "'] is not None else None\n"
 
         str_class = '''$license
 $imports
@@ -177,7 +177,7 @@ class $class_name($base_class_name):
             output = "from datetime import " + object_type
 
         elif object_type == "Guid":
-            output = "from .object_base import Guid"
+            output = "from .{} import Guid".format(Metadata.camel_to_lowercase(BASE_CLASS))
 
         else:
             type_file = Metadata.camel_to_lowercase(object_type)
@@ -223,7 +223,7 @@ class $class_name($base_class_name):
             else:
                 attributes += p_type + "(properties['" + p_name + "'])"
 
-            attributes += " if '" + p_name + "' in properties else None\n"
+            attributes += " \\\n            if '" + p_name + "' in properties and properties['" + p_name + "'] is not None else None\n"
 
         str_class = '''$license
 $imports
@@ -283,9 +283,9 @@ class $class_name($base_class_name):
         base_class_file = Metadata.camel_to_lowercase(BASE_CLASS) + ".py"
         copyfile(INPUT_PATH + "/" + base_class_file, OUTPUT_PATH + "/" + base_class_file)
 
-        # auxiliary file
-        copyfile(INPUT_PATH + "/" + AUXILIARY_FILE, OUTPUT_PATH + "/" + AUXILIARY_FILE)
-        with open(OUTPUT_PATH + "/" + AUXILIARY_FILE, 'a') as f:
+        # extension file
+        copyfile(INPUT_PATH + "/" + EXTENSION_FILE, OUTPUT_PATH + "/" + EXTENSION_FILE)
+        with open(OUTPUT_PATH + "/" + EXTENSION_FILE, 'a') as f:
 
             f.write("ODATA_CONTAINER_TYPE = {")
             for k, v in self.odata_containers.items():

@@ -1,8 +1,8 @@
 """Auxiliary classes and functions to support the model"""
 
 from re import match
-from .object_base import *
-from .. import *
+from .odata_object_base import Guid
+from . import *
 
 
 def get_object_class(odata_context, odata_type=None):

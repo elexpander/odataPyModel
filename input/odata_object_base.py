@@ -1,17 +1,41 @@
 """Base object class and other classes."""
-
 from re import fullmatch, search
 from datetime import datetime, date, time
 
 
-class ObjectBase(object):
+class OdataObjectBase(object):
+    odata = ""
+    valid_odata_properties = {}
+    valid_properties = {
+        'disabled_plans': {'python_type': '*Guid', 'odata_name': 'disabledPlans', 'odata_type': 'Collection(Edm.Guid)'},
+        'sku_id': {'python_type': 'Guid', 'odata_name': 'skuId', 'odata_type': 'Edm.Guid'}}
+
+    @classmethod
+    def get_property_odata_name(cls, name):
+        if name in cls.valid_properties:
+            return cls.valid_properties[name]['odata_name']
+        else:
+            try:
+                return cls.__bases__[0].get_property_odata_name(name)
+            except AttributeError:
+                raise ValueError("Property '{}' not valid.".format(name))
+
+    @classmethod
+    def property_is_collection(cls, name):
+        if name in cls.valid_properties:
+            return cls.valid_properties[name]['odata_type'].startswith("Collection")
+        else:
+            try:
+                return cls.__bases__[0].property_is_collection(name)
+            except AttributeError:
+                raise ValueError("Property '{}' not valid.".format(name))
 
     def __repr__(self):
         """Returns string representation of the object in a single line"""
         output = '<ODATA ' + type(self).__name__ + ': {'
         for k, v in self.__dict__.items():
             if v is not None:
-                output += k + ': ' + str(v) + ', '
+                output += k + ': ' + str(repr(v)) + ', '
         output += '}>'
         return output
 
@@ -24,17 +48,22 @@ class ObjectBase(object):
         output += '}>'
         return output
 
-    def serialize(self):
+    def serialized(self):
         """Returns the serialized form of the object as a dict."""
-        serialized = {}
+        odata_dict = {}
 
         for prop in self.__dict__:
-            if isinstance(self.__dict__[prop], ObjectBase):
-                serialized[prop] = self.__dict__[prop].serialize()
-            else:
-                serialized[prop] = str(self.__dict__[prop])
+            oname = self.get_property_odata_name(prop)
 
-        return serialized
+            if isinstance(self.__dict__[prop], OdataObjectBase):
+                # if the property is an object, get its serialized form
+                odata_dict[oname] = self.__dict__[prop].serialized()
+            elif self.__dict__[prop] is not None:
+
+                # if the property has a value, get its string representation
+                odata_dict[oname] = self.__dict__[prop]
+
+        return odata_dict
 
 
 class Guid(str):
@@ -89,4 +118,3 @@ class DateTime(datetime):
         t = Time(value)
 
         self = datetime.combine(d, t)
-
