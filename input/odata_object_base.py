@@ -6,9 +6,7 @@ from datetime import datetime, date, time
 class OdataObjectBase(object):
     odata = ""
     valid_odata_properties = {}
-    valid_properties = {
-        'disabled_plans': {'python_type': '*Guid', 'odata_name': 'disabledPlans', 'odata_type': 'Collection(Edm.Guid)'},
-        'sku_id': {'python_type': 'Guid', 'odata_name': 'skuId', 'odata_type': 'Edm.Guid'}}
+    valid_properties = {}
 
     @classmethod
     def get_property_odata_name(cls, name):
@@ -47,6 +45,50 @@ class OdataObjectBase(object):
                 output += '\t' + k + ': ' + str(repr(v)) + ',\n'
         output += '}>'
         return output
+
+    def set(self, **kwargs):
+        """Set object attributes after checking that value type is correct for the attribute.
+        :param kwargs: Key-value pairs passed to function: attribute name - attribute value.
+        :type kwargs: Dictionary.
+        """
+        args = kwargs
+        c = self.__class__
+
+        while args and c != OdataObjectBase:
+            inherited_args = {}
+
+            for k, v in args.items():
+                if k in c.valid_properties:
+
+                    # Get paramter type
+                    pt = c.valid_properties[k]['python_type']
+                    pt, is_list = (pt[1:], True) if pt.startswith("*") else (pt, False)
+
+                    if is_list:
+                        if type(v).__name__ == pt:
+                            setattr(self, k, [v])
+                        elif type(v).__name__ == list:
+                            for i in v:
+                                if type(i).__name__ != pt:
+                                    raise ValueError("Parameter {} must be list of {}.".format(k, pt))
+                            setattr(self, k, v)
+                        else:
+                            raise ValueError("Parameter {} must be list of {}.".format(k, pt))
+
+                    else:
+                        if type(v).__name__ == pt:
+                            setattr(self, k, v)
+                        else:
+                            raise ValueError("Parameter {} must be {}.".format(k, pt))
+
+                else:
+                    # getattr raises AttributeError if attribute doesn't exisst
+                    getattr(self, k)
+                    # Attribute is inherited
+                    inherited_args[k] = v
+
+            args = inherited_args
+            c = c.__bases__[0]
 
     def serialized(self):
         """Returns the serialized form of the object as a dict."""

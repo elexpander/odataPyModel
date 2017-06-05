@@ -97,7 +97,7 @@ class $class_name($base_class_name):
     valid_odata_properties = $odata_properties
     valid_properties = $python_properties
     
-    def __init__(self, odata_properties):
+    def __init__(self, odata_properties={}, **kwargs):
         """Initialization of $odata_name instance
         :param odata_properties: dictionary of properties in their original odata name
                                  with their values.
@@ -107,7 +107,8 @@ class $class_name($base_class_name):
         str_class += '''        # Convert properties' names to python format
         properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
                       if key in $class_name.valid_odata_properties}'''
-        str_class += "\n        $attributes"
+        str_class += "\n        $attributes\n"
+        str_class += '''        if kwargs:\n            self.set(**kwargs)\n\n'''
 
         str_imports = "".join([line + "\n" for line in imports if isinstance(line, str)])
 
@@ -190,6 +191,9 @@ class $class_name($base_class_name):
     def add_entitytype(self, name, schema):
 
         d_prop = {}
+        attributes = "# Properties\n"
+
+        # Build ODATA_PROPERTY_TYPE dictionary
         for k, v in {np.odata_name: np.odata_type for np in schema.navigation_properties.values()}.items():
             d_prop[k] = v.replace("Collection(", "").rstrip(')')
         for k, v in {np.odata_name: np.odata_type for np in schema.properties.values()}.items():
@@ -199,9 +203,10 @@ class $class_name($base_class_name):
         base_class_name = schema.base if schema.base else BASE_CLASS
         imports = [self.get_import_line(base_class_name)]
 
+        # Build value for valid_odata_properties
         odata_properties = {value['odata_name']: key for (key, value) in schema.properties.items()}
 
-        attributes = "# Properties\n"
+        # Build class attributes assigment code
         for p_name, p_item in schema.properties.items():
             attributes += "        self." + p_name + " = "
 
@@ -235,7 +240,7 @@ class $class_name($base_class_name):
     valid_odata_properties = $odata_properties
     valid_properties = $python_properties
 
-    def __init__(self, odata_properties):
+    def __init__(self, odata_properties={}, **kwargs):
         """Initialization of $odata_name instance
         :param odata_properties: dictionary of properties in their original odata name
                                  with their values.
@@ -244,13 +249,14 @@ class $class_name($base_class_name):
         str_imports = "".join([line + "\n" for line in imports if isinstance(line, str)])
 
         if base_class_name != BASE_CLASS:
-            str_class += '''        super().__init__(odata_properties)\n\n'''
+            str_class += '''        super().__init__(odata_properties, **kwargs)\n\n'''
 
         str_class += '''        # Convert properties' names to python format
         properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
                       if key in $class_name.valid_odata_properties}\n'''
 
-        str_class += '''\n        $attributes\n\n'''
+        str_class += '''\n        $attributes\n'''
+        str_class += '''        if kwargs:\n            self.set(**kwargs)\n\n'''
 
         dic_values = {'class_name': name,
                       'base_class_name': base_class_name,
