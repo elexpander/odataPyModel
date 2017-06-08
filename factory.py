@@ -104,9 +104,13 @@ class $class_name($base_class_name):
         """  
         super().__init__()
 '''
-        str_class += '''        # Convert properties' names to python format
-        properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
-                      if key in $class_name.valid_odata_properties}'''
+        str_class += '''        try:
+            # Convert properties' names to python format
+            properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
+                          if key in $class_name.valid_odata_properties}
+        except AttributeError:
+            raise ValueError("Positional parameter 'odata_properties' must be a dictionary.")\n'''
+
         str_class += "\n        $attributes\n"
         str_class += '''        if kwargs:\n            self.set(**kwargs)\n\n'''
 
@@ -251,9 +255,12 @@ class $class_name($base_class_name):
         if base_class_name != BASE_CLASS:
             str_class += '''        super().__init__(odata_properties, **kwargs)\n\n'''
 
-        str_class += '''        # Convert properties' names to python format
-        properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
-                      if key in $class_name.valid_odata_properties}\n'''
+        str_class += '''        try:
+            # Convert properties' names to python format
+            properties = {$class_name.valid_odata_properties[key]: value for key, value in odata_properties.items() \\
+                          if key in $class_name.valid_odata_properties}
+        except AttributeError:
+            raise ValueError("Positional parameter 'odata_properties' must be a dictionary.")\n'''
 
         str_class += '''\n        $attributes\n'''
         str_class += '''        if kwargs:\n            self.set(**kwargs)\n\n'''
@@ -272,7 +279,7 @@ class $class_name($base_class_name):
     ######################################################################
 
     def save(self):
-        str_package = '"""Package with all classes representing data model."""\n\n'
+        str_package = ""
 
         # object classes files
         for class_name, str_class in self.classes.items():
@@ -282,7 +289,8 @@ class $class_name($base_class_name):
                 f.write(str_class)
 
         # __init__.py
-        with open(OUTPUT_PATH + "/__init__.py", 'w') as f:
+        copyfile(INPUT_PATH + "/__init__.py", OUTPUT_PATH + "/__init__.py")
+        with open(OUTPUT_PATH + "/__init__.py", 'a') as f:
             f.write(str_package)
 
         # object base file

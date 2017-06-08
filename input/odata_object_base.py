@@ -58,35 +58,43 @@ class OdataObjectBase(object):
             inherited_args = {}
 
             for k, v in args.items():
+
+                # Check if attribute belongs to the current class
                 if k in c.valid_properties:
 
-                    # Get paramter type
-                    pt = c.valid_properties[k]['python_type']
-                    pt, is_list = (pt[1:], True) if pt.startswith("*") else (pt, False)
+                    # Get paramter type name and find out if it's a list
+                    pt_name = c.valid_properties[k]['python_type']
+                    pt_name, is_list = (pt_name[1:], True) if pt_name.startswith("*") else (pt_name, False)
 
                     if is_list:
-                        if type(v).__name__ == pt:
+                        # If attribute is a list, we accept a list of objects or an object
+                        # as long as they are the right type
+                        if type(v).__name__ == pt_name:
+                            # Assign a list of the object to the attribute
                             setattr(self, k, [v])
-                        elif type(v).__name__ == list:
+                        elif isinstance(v, list):
                             for i in v:
-                                if type(i).__name__ != pt:
-                                    raise ValueError("Parameter {} must be list of {}.".format(k, pt))
+                                if type(i).__name__ != pt_name:
+                                    raise ValueError("Parameter {} must be list of {}.".format(k, pt_name))
+                            # Assign the object to the attribute
                             setattr(self, k, v)
                         else:
-                            raise ValueError("Parameter {} must be list of {}.".format(k, pt))
+                            raise ValueError("Parameter {} must be list of {}.".format(k, pt_name))
 
                     else:
-                        if type(v).__name__ == pt:
+                        # Attribute must be a single object of the right type
+                        if type(v).__name__ == pt_name:
                             setattr(self, k, v)
                         else:
-                            raise ValueError("Parameter {} must be {}.".format(k, pt))
+                            raise ValueError("Parameter {} must be {}.".format(k, pt_name))
 
                 else:
-                    # getattr raises AttributeError if attribute doesn't exisst
+                    # getattr raises AttributeError if attribute doesn't exist
                     getattr(self, k)
                     # Attribute is inherited
                     inherited_args[k] = v
 
+            # Next while loop will process inherited attributes and base class
             args = inherited_args
             c = c.__bases__[0]
 
