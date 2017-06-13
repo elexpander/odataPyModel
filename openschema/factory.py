@@ -1,25 +1,81 @@
 """
 Module to create Classes
 """
-from metadata import Metadata
+from .metadata import *
 from string import Template
 from shutil import copyfile
+import logging
+import json
 
 
 BASE_CLASS = "OdataObjectBase"
-INPUT_PATH = "input"
-OUTPUT_PATH = "output"
 EXTENSION_FILE = "extension.py"
+MODEL_FILENAME = "model.json"
 
 
 class ClassFactory(object):
 
-    def __init__(self, odata_types):
-        self.odata_types = odata_types
+    def __init__(self, metadata_url, temp_loc, output_loc):
+
+        """
+        Loads classes from model file
+        If model file doesn't exist, it generates it from the metadata.
+        :param model_file: name of file with model in json format
+        :param base_url: url of the metadata
+        """
+        self.input_location = "./input/"
+        self.output_location = output_loc
+        self.temp_location = temp_loc
+
+        self.odata_types = {}
         self.odata_containers = {}
         self.odata_properties = {}
         self.classes = {}
 
+        # Create model file from metadata
+        self.metadata = Metadata(metadata_url, temp_loc)
+
+        # Save model to json file for review
+        with open(temp_loc + MODEL_FILENAME, 'w') as f:
+            json.dump(self.metadata.classes, f, indent=4)
+
+        '''
+        with open("model_sets.json", 'w') as f:
+            json.dump(metadata.sets, f, indent=4)
+
+        with open("model_udm.json", 'w') as f:
+            json.dump(metadata.odata_types, f, indent=4)
+        '''
+        self.load_classes()
+
+    def load_classes(self):
+        """Return dictionary with all Graph Classes
+        """
+        for name, graph_class in self.metadata.classes.items():
+
+            if isinstance(graph_class, EntityType):
+                self.add_entitytype(name, graph_class)
+
+            elif isinstance(graph_class, ComplexType):
+                self.add_complextype(name, graph_class)
+
+            elif isinstance(graph_class, EnumType):
+                self.add_enumtype(name, graph_class)
+
+            else:
+                logging.warning("Class " + name + " is not a known EDM type.")
+
+        for name, graph_set in self.metadata.sets.items():
+            if isinstance(graph_set, Singleton):
+                self.add_singleton(name, graph_set)
+
+            elif isinstance(graph_set, EntitySet):
+                self.add_entityset(name, graph_set)
+
+            else:
+                logging.warning("Class " + name + " is not a known EDM type.")
+
+        self.save()
 
     ######################################################################
 
@@ -285,21 +341,21 @@ class $class_name($base_class_name):
         for class_name, str_class in self.classes.items():
             file_name = Metadata.camel_to_lowercase(class_name)
             str_package += "from ." + file_name + " import " + class_name + "\n"
-            with open(OUTPUT_PATH + "/" + file_name + ".py", 'w') as f:
+            with open(self.output_location + file_name + ".py", 'w') as f:
                 f.write(str_class)
 
         # __init__.py
-        copyfile(INPUT_PATH + "/__init__.py", OUTPUT_PATH + "/__init__.py")
-        with open(OUTPUT_PATH + "/__init__.py", 'a') as f:
+        copyfile(self.input_location + "__init__.py",self.output_location + "__init__.py")
+        with open(self.output_location + "__init__.py", 'a') as f:
             f.write(str_package)
 
         # object base file
         base_class_file = Metadata.camel_to_lowercase(BASE_CLASS) + ".py"
-        copyfile(INPUT_PATH + "/" + base_class_file, OUTPUT_PATH + "/" + base_class_file)
+        copyfile(self.input_location + base_class_file, self.output_location + base_class_file)
 
         # extension file
-        copyfile(INPUT_PATH + "/" + EXTENSION_FILE, OUTPUT_PATH + "/" + EXTENSION_FILE)
-        with open(OUTPUT_PATH + "/" + EXTENSION_FILE, 'a') as f:
+        copyfile(self.input_location + EXTENSION_FILE, self.output_location + EXTENSION_FILE)
+        with open(self.output_location + EXTENSION_FILE, 'a') as f:
 
             f.write("ODATA_CONTAINER_TYPE = {")
             for k, v in self.odata_containers.items():

@@ -2,7 +2,7 @@
 # Files created by app
 metadata.xml
 output/*
-model*.json
+tmp/*
 
 # PyCharm files
 .idea

@@ -207,11 +207,11 @@ class EntityType(ComplexType):
 
 class Metadata(object):
 
-    def __init__(self, metadata_url):
-        super().__init__()
+    def __init__(self, metadata_url, working_dir):
 
         # variables
-        self._metadata_file = 'metadata.xml'
+        self._metadata_filename = 'metadata.xml'
+        self._working_dir = working_dir
         self._xmlns = '{http://docs.oasis-open.org/odata/ns/edm}'
         self._namespace = ''
         self.class_prefix = 'Graph'
@@ -219,21 +219,21 @@ class Metadata(object):
         self.classes = {}
         self.odata_containers = {}
         self.odata_types = {'Edm.String': 'str',
-                          'Edm.SByte': 'int',
-                          'Edm.Int16': 'int',
-                          'Edm.Int32': 'int',
-                          'Edm.Int64': 'int',
-                          'Edm.Decimal': 'float',
-                          'Edm.Single': 'float',
-                          'Edm.Double': 'float',
-                          'Edm.Boolean': 'bool',
-                          'Edm.TimeOfDay': 'str',
-                          'Edm.Date': 'str',
-                          'Edm.DateTimeOffset': 'str',
-                          'Edm.Duration': 'str',
-                          'Edm.Guid': 'Guid',
-                          'Edm.Stream': 'bytes',
-                          'Edm.Binary': 'bytes'}
+                            'Edm.SByte': 'int',
+                            'Edm.Int16': 'int',
+                            'Edm.Int32': 'int',
+                            'Edm.Int64': 'int',
+                            'Edm.Decimal': 'float',
+                            'Edm.Single': 'float',
+                            'Edm.Double': 'float',
+                            'Edm.Boolean': 'bool',
+                            'Edm.TimeOfDay': 'str',
+                            'Edm.Date': 'str',
+                            'Edm.DateTimeOffset': 'str',
+                            'Edm.Duration': 'str',
+                            'Edm.Guid': 'Guid',
+                            'Edm.Stream': 'bytes',
+                            'Edm.Binary': 'bytes'}
 
         # functions
         def add_xmlns_to_tag(tag):
@@ -297,12 +297,12 @@ class Metadata(object):
             pass
 
         # begining of _init_
-        if not isfile(self._metadata_file):
+        if not isfile(self._working_dir + self._metadata_filename):
             # Download file
-            urlretrieve(metadata_url, self._metadata_file)
+            urlretrieve(metadata_url, self._working_dir + self._metadata_filename)
 
         # Load schema XML file
-        tree = ET.parse(self._metadata_file)
+        tree = ET.parse(self._working_dir + self._metadata_filename)
         schema = next(tree.iter(add_xmlns_to_tag('Schema')))
 
         # Load namespace prefix, normally microsoft.graph
@@ -480,42 +480,46 @@ class Metadata(object):
 
         # Process Actions
         for e_type in schema.findall(add_xmlns_to_tag('Action')):
-            action_name = pythonize_attribute(e_type.attrib['Name'])
+            action_name = pythonize_attribute(e_type.attrib["Name"])
             parameters = {}
             binding = None
 
+            # Process bound actions only
+            if not e_type.attrib.get("IsBound") == "true":
+                logging.info("Action {name} not supported, it is not bound.".
+                             format(name=action_name))
+                continue
+
+            # Get parameters
             for e_attrib in e_type.findall(add_xmlns_to_tag('Parameter')):
-                if e_attrib.attrib['Name'] == 'bindingParameter':
+                if not binding:
+                    # First parameter is the binding parameter
                     binding = pythonize_type(e_attrib.attrib['Type'])
                 else:
                     # Add attribute type to parameters dictionary
                     parameters[pythonize_attribute(e_attrib.attrib['Name'])] = pythonize_type(e_attrib.attrib['Type'])
 
-            if binding:
-                if binding.startswith("*"):
-                    logging.info("Action {action} not supported, it binds to collection {binding}.".
-                                 format(action=action_name, binding=binding))
-                    continue
+            if binding.startswith("*"):
+                logging.info("Action {action} not supported, it binds to collection {binding}.".
+                             format(action=action_name, binding=binding))
+                continue
 
-                # Load return_graph_type
-                et_return_type = e_type.find(add_xmlns_to_tag('ReturnType'))
-                try:
-                    return_type = pythonize_type(et_return_type.attrib['Type'])
-                except AttributeError:
-                    return_type = None
+            # Load return_graph_type
+            et_return_type = e_type.find(add_xmlns_to_tag('ReturnType'))
+            try:
+                return_type = pythonize_type(et_return_type.attrib['Type'])
+            except AttributeError:
+                return_type = None
 
-                type_function = OdataFunction(returns=return_type,
-                                              parameters=parameters)
+            type_function = OdataFunction(returns=return_type,
+                                          parameters=parameters)
 
-                # Attach action to entity_type in graph_type dictionary
-                try:
-                    self.classes[binding].add_action(action_name, type_function)
-                except KeyError:
-                    raise KeyError("Key not found in dictionary trying to add action {name} to binding {binding}".
-                                   format(name=action_name, binding=binding))
-            else:
-                logging.info("Action {name} not supported, no bindingParameter found.".
-                             format(name=action_name))
+            # Attach action to entity_type in graph_type dictionary
+            try:
+                self.classes[binding].add_action(action_name, type_function)
+            except KeyError:
+                raise KeyError("Key not found in dictionary trying to add action {name} to binding {binding}".
+                               format(name=action_name, binding=binding))
 
         # Process Functions
         for e_type in schema.findall(add_xmlns_to_tag('Function')):
@@ -523,39 +527,42 @@ class Metadata(object):
             parameters = {}
             binding = None
 
+            # Process bound functions only
+            if not e_type.attrib.get("IsBound") == "true":
+                logging.info("Function {name} not supported, it is not bound.".
+                             format(name=function_name))
+                continue
+
+            # Get parameters
             for e_attrib in e_type.findall(add_xmlns_to_tag('Parameter')):
-                if e_attrib.attrib['Name'] == 'bindingParameter':
+                if not binding:
+                    # First parameter is the binding parameter
                     binding = pythonize_type(e_attrib.attrib['Type'])
                 else:
                     # Add attribute type to parameters dictionary
                     parameters[e_attrib.attrib['Name']] = pythonize_type(e_attrib.attrib['Type'])
 
-            if binding:
-                if binding.startswith("*"):
-                    logging.info("Function {name} not supported, it binds to collection {binding}.".
-                                 format(name=function_name, binding=binding))
-                    continue
+            if binding.startswith("*"):
+                logging.info("Function {name} not supported, it binds to collection {binding}.".
+                             format(name=function_name, binding=binding))
+                continue
 
-                # Load return_graph_type
-                et_return_type = e_type.find(add_xmlns_to_tag('ReturnType'))
-                try:
-                    return_type = pythonize_type(et_return_type.attrib['Type'])
-                except AttributeError:
-                    return_type = None
+            # Load return_graph_type
+            et_return_type = e_type.find(add_xmlns_to_tag('ReturnType'))
+            try:
+                return_type = pythonize_type(et_return_type.attrib['Type'])
+            except AttributeError:
+                return_type = None
 
-                type_function = OdataFunction(returns=return_type,
-                                              parameters=parameters)
+            type_function = OdataFunction(returns=return_type,
+                                          parameters=parameters)
 
-                # Attach function to entity_type in graph_type dictionary
-                try:
-                    self.classes[binding].add_function(function_name, type_function)
-                except KeyError:
-                    raise KeyError("Key not found in dictionary trying to add function {name} to binding {binding}".
-                                   format(name=function_name, binding=binding))
-
-            else:
-                logging.info("Function {name} not supported, no bindingParameter found.".
-                             format(name=function_name))
+            # Attach function to entity_type in graph_type dictionary
+            try:
+                self.classes[binding].add_function(function_name, type_function)
+            except KeyError:
+                raise KeyError("Key not found in dictionary trying to add function {name} to binding {binding}".
+                               format(name=function_name, binding=binding))
 
     @staticmethod
     def camel_to_lowercase(name):
