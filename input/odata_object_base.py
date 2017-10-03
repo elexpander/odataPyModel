@@ -118,9 +118,9 @@ class OdataObjectBase(object):
 
 class Guid(str):
     """Object represents a GUID which is a string."""
-    def __new__(cls, value):
+    def __new__(cls, *value):
         if fullmatch("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", value):
-            return str.__new__(cls, value)
+            return str.__new__(value)
         else:
             raise ValueError("String doesn't look like a GUID.")
 

@@ -1,6 +1,4 @@
 import xml.etree.ElementTree as ET
-from urllib.request import urlretrieve
-from os.path import isfile
 import logging
 from keyword import iskeyword
 
@@ -207,14 +205,12 @@ class EntityType(ComplexType):
 
 class Metadata(object):
 
-    def __init__(self, metadata_url, working_dir):
+    def __init__(self, metadata_file, class_prefix):
 
         # variables
-        self._metadata_filename = 'metadata.xml'
-        self._working_dir = working_dir
         self._xmlns = '{http://docs.oasis-open.org/odata/ns/edm}'
         self._namespace = ''
-        self.class_prefix = 'Graph'
+        self.class_prefix = class_prefix
         self.sets = {}
         self.classes = {}
         self.odata_containers = {}
@@ -288,21 +284,10 @@ class Metadata(object):
 
             return name
 
-        def pythonize_context(name):
-            """
-            Convert odata context to python type
-            :param name: context
-            :return: python type
-            """
-            pass
-
         # begining of _init_
-        if not isfile(self._working_dir + self._metadata_filename):
-            # Download file
-            urlretrieve(metadata_url, self._working_dir + self._metadata_filename)
 
         # Load schema XML file
-        tree = ET.parse(self._working_dir + self._metadata_filename)
+        tree = ET.parse(metadata_file)
         schema = next(tree.iter(add_xmlns_to_tag('Schema')))
 
         # Load namespace prefix, normally microsoft.graph
@@ -486,8 +471,8 @@ class Metadata(object):
 
             # Process bound actions only
             if not e_type.attrib.get("IsBound") == "true":
-                logging.info("Action {name} not supported, it is not bound.".
-                             format(name=action_name))
+                logging.warning("Action {name} not supported, it is not bound.".
+                                format(name=action_name))
                 continue
 
             # Get parameters
@@ -500,8 +485,8 @@ class Metadata(object):
                     parameters[pythonize_attribute(e_attrib.attrib['Name'])] = pythonize_type(e_attrib.attrib['Type'])
 
             if binding.startswith("*"):
-                logging.info("Action {action} not supported, it binds to collection {binding}.".
-                             format(action=action_name, binding=binding))
+                logging.warning("Action {action} not supported, it binds to collection {binding}.".
+                                format(action=action_name, binding=binding))
                 continue
 
             # Load return_graph_type
@@ -529,8 +514,8 @@ class Metadata(object):
 
             # Process bound functions only
             if not e_type.attrib.get("IsBound") == "true":
-                logging.info("Function {name} not supported, it is not bound.".
-                             format(name=function_name))
+                logging.warning("Function {name} not supported, it is not bound.".
+                                format(name=function_name))
                 continue
 
             # Get parameters
@@ -543,8 +528,8 @@ class Metadata(object):
                     parameters[e_attrib.attrib['Name']] = pythonize_type(e_attrib.attrib['Type'])
 
             if binding.startswith("*"):
-                logging.info("Function {name} not supported, it binds to collection {binding}.".
-                             format(name=function_name, binding=binding))
+                logging.warning("Function {name} not supported, it binds to collection {binding}.".
+                                format(name=function_name, binding=binding))
                 continue
 
             # Load return_graph_type
@@ -563,18 +548,3 @@ class Metadata(object):
             except KeyError:
                 raise KeyError("Key not found in dictionary trying to add function {name} to binding {binding}".
                                format(name=function_name, binding=binding))
-
-    @staticmethod
-    def camel_to_lowercase(name):
-        """
-        Convert camel case name into lower case and words separated by underscores
-        :param name: string with name in thisFormat
-        :return: string with name in this_format
-        """
-        name = name[0].lower() + name[1:]
-        name = ''.join(["_" + c.lower() if c.isupper() else c for c in name])
-
-        while iskeyword(name):
-            name = "_" + name
-
-        return name

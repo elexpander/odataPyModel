@@ -1,7 +1,10 @@
 """
 Module to create Classes
 """
-from .metadata import *
+
+from . import metadata
+from urllib.request import urlretrieve
+from keyword import iskeyword
 from string import Template
 from shutil import copyfile
 import logging
@@ -9,73 +12,83 @@ import json
 
 
 BASE_CLASS = "OdataObjectBase"
-EXTENSION_FILE = "extension.py"
-MODEL_FILENAME = "model.json"
+EXTENSION_FILENAME = "extension.py"
+METADATA_FILENAME = "metadata.xml"
+CLASSES_FILENAME = "classes.json"
+SETS_FILENAME = "sets.json"
+ODATA_TYPES_FILENAME = "odata_types.json"
+
+
+def camel_to_lowercase(name):
+    """
+    Convert camel case name into lower case and words separated by underscores
+    :param name: string with name in thisFormat
+    :return: string with name in this_format
+    """
+    name = name[0].lower() + name[1:]
+    name = ''.join(["_" + c.lower() if c.isupper() else c for c in name])
+
+    while iskeyword(name):
+        name = "_" + name
+    return name
 
 
 class ClassFactory(object):
 
-    def __init__(self, metadata_url, temp_loc, output_loc):
-
+    def __init__(self, metadata_url, class_prefix, input_loc, temp_loc):
+        """Creates classes from the metadata URL.
         """
-        Loads classes from model file
-        If model file doesn't exist, it generates it from the metadata.
-        :param model_file: name of file with model in json format
-        :param base_url: url of the metadata
-        """
-        self.input_location = "./input/"
-        self.output_location = output_loc
+        self.input_location = input_loc
         self.temp_location = temp_loc
+
+        self.metadata_file = self.temp_location + METADATA_FILENAME
 
         self.odata_types = {}
         self.odata_containers = {}
         self.odata_properties = {}
         self.classes = {}
 
-        # Create model file from metadata
-        self.metadata = Metadata(metadata_url, temp_loc)
+        # Download metadata file
+        urlretrieve(metadata_url, self.metadata_file)
+
+        # Create metadata object from file
+        self.metadata = metadata.Metadata(self.metadata_file, class_prefix)
 
         # Save model to json file for review
-        with open(temp_loc + MODEL_FILENAME, 'w') as f:
+        with open(self.temp_location + CLASSES_FILENAME, 'w') as f:
             json.dump(self.metadata.classes, f, indent=4)
 
-        '''
-        with open("model_sets.json", 'w') as f:
-            json.dump(metadata.sets, f, indent=4)
+        with open(self.temp_location + SETS_FILENAME, 'w') as f:
+            json.dump(self.metadata.sets, f, indent=4)
 
-        with open("model_udm.json", 'w') as f:
-            json.dump(metadata.odata_types, f, indent=4)
-        '''
-        self.load_classes()
+        with open(self.temp_location + ODATA_TYPES_FILENAME, 'w') as f:
+            json.dump(self.metadata.odata_types, f, indent=4)
 
-    def load_classes(self):
-        """Return dictionary with all Graph Classes
-        """
-        for name, graph_class in self.metadata.classes.items():
+        # Process classes
+        for name, c in self.metadata.classes.items():
 
-            if isinstance(graph_class, EntityType):
-                self.add_entitytype(name, graph_class)
+            if isinstance(c, metadata.EntityType):
+                self.add_entitytype(name, c)
 
-            elif isinstance(graph_class, ComplexType):
-                self.add_complextype(name, graph_class)
+            elif isinstance(c, metadata.ComplexType):
+                self.add_complextype(name, c)
 
-            elif isinstance(graph_class, EnumType):
-                self.add_enumtype(name, graph_class)
+            elif isinstance(c, metadata.EnumType):
+                self.add_enumtype(name, c)
 
             else:
                 logging.warning("Class " + name + " is not a known EDM type.")
 
-        for name, graph_set in self.metadata.sets.items():
-            if isinstance(graph_set, Singleton):
-                self.add_singleton(name, graph_set)
+        # Process sets (and singletons)
+        for name, s in self.metadata.sets.items():
+            if isinstance(s, metadata.Singleton):
+                self.add_singleton(name, s)
 
-            elif isinstance(graph_set, EntitySet):
-                self.add_entityset(name, graph_set)
+            elif isinstance(s, metadata.EntitySet):
+                self.add_entityset(name, s)
 
             else:
                 logging.warning("Class " + name + " is not a known EDM type.")
-
-        self.save()
 
     ######################################################################
 
@@ -238,10 +251,10 @@ class $class_name($base_class_name):
             output = "from datetime import " + object_type
 
         elif object_type == "Guid":
-            output = "from .{} import Guid".format(Metadata.camel_to_lowercase(BASE_CLASS))
+            output = "from .{} import Guid".format(camel_to_lowercase(BASE_CLASS))
 
         else:
-            type_file = Metadata.camel_to_lowercase(object_type)
+            type_file = camel_to_lowercase(object_type)
             output = "from ." + type_file + " import " + object_type
 
         return output
@@ -334,28 +347,28 @@ class $class_name($base_class_name):
 
     ######################################################################
 
-    def save(self):
+    def save(self, output_loc):
         str_package = ""
 
         # object classes files
         for class_name, str_class in self.classes.items():
-            file_name = Metadata.camel_to_lowercase(class_name)
+            file_name = camel_to_lowercase(class_name)
             str_package += "from ." + file_name + " import " + class_name + "\n"
-            with open(self.output_location + file_name + ".py", 'w') as f:
+            with open(output_loc + file_name + ".py", 'w') as f:
                 f.write(str_class)
 
         # __init__.py
-        copyfile(self.input_location + "__init__.py",self.output_location + "__init__.py")
-        with open(self.output_location + "__init__.py", 'a') as f:
+        copyfile(self.input_location + "__init__.py",output_loc + "__init__.py")
+        with open(output_loc + "__init__.py", 'a') as f:
             f.write(str_package)
 
         # object base file
-        base_class_file = Metadata.camel_to_lowercase(BASE_CLASS) + ".py"
-        copyfile(self.input_location + base_class_file, self.output_location + base_class_file)
+        base_class_file = camel_to_lowercase(BASE_CLASS) + ".py"
+        copyfile(self.input_location + base_class_file, output_loc + base_class_file)
 
         # extension file
-        copyfile(self.input_location + EXTENSION_FILE, self.output_location + EXTENSION_FILE)
-        with open(self.output_location + EXTENSION_FILE, 'a') as f:
+        copyfile(self.input_location + EXTENSION_FILENAME, output_loc + EXTENSION_FILENAME)
+        with open(output_loc + EXTENSION_FILENAME, 'a') as f:
 
             f.write("ODATA_CONTAINER_TYPE = {")
             for k, v in self.odata_containers.items():
@@ -363,7 +376,7 @@ class $class_name($base_class_name):
             f.write("}\n\n")
 
             f.write("ODATA_TYPE_TO_PYTHON = {")
-            for k, v in self.odata_types.items():
+            for k, v in self.metadata.odata_types.items():
                 f.write("'" + k + "': " + v + ",\n                        ")
             f.write("}\n\n")
 
