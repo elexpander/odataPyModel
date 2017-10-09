@@ -1,8 +1,11 @@
 
 # Files created by app
 metadata.xml
-output/*
-tmp/*
+output/*.py
+tmp/*.log
+tmp/*.json
+tmp/*.xml
+
 
 # PyCharm files
 .idea
