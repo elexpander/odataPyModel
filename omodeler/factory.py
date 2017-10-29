@@ -1,5 +1,5 @@
 """
-Module to create Classes
+Licensed under the MIT License.
 """
 
 from . import metadata
@@ -17,11 +17,11 @@ METADATA_FILENAME = "metadata.xml"
 CLASSES_FILENAME = "classes.json"
 SETS_FILENAME = "sets.json"
 ODATA_TYPES_FILENAME = "odata_types.json"
+MODULE_DOCSTRING = '"""Written by odataPyModel."""'
 
 
 def camel_to_lowercase(name):
-    """
-    Convert camel case name into lower case and words separated by underscores
+    """Convert camel case name into lower case and words separated by underscores
     :param name: string with name in thisFormat
     :return: string with name in this_format
     """
@@ -37,6 +37,10 @@ class ClassFactory(object):
 
     def __init__(self, metadata_url, class_prefix, input_loc, temp_loc):
         """Creates classes from the metadata URL.
+        :param metadata_url: URL to the odata metadata XML file
+        :param class_prefix: prefix for the new classes
+        :param input_loc: directory containing input files
+        :param temp_loc: directory for the temporary files
         """
         self.input_location = input_loc
         self.temp_location = temp_loc
@@ -94,7 +98,7 @@ class ClassFactory(object):
 
     def add_enumtype(self, name, schema_type):
 
-        str_class = """$license
+        str_class = """$module_docstring
 
 
 class $class_name(str):
@@ -113,7 +117,7 @@ class $class_name(str):
         dic_values = {'class_name': name,
                       'odata_name': schema_type.odata_name,
                       'valid_values': schema_type.valid_values,
-                      'license': '"""License"""'}
+                      'module_docstring': MODULE_DOCSTRING}
 
         self.classes[name] = Template(str_class).substitute(dic_values)
 
@@ -156,7 +160,7 @@ class $class_name(str):
 
             attributes += " \\\n            if '" + p_name + "' in properties and properties['" + p_name + "'] is not None else None\n"
 
-        str_class = '''$license
+        str_class = '''$module_docstring
 $imports
 
 class $class_name($base_class_name):
@@ -192,7 +196,7 @@ class $class_name($base_class_name):
                       'python_properties': str(schema.properties).replace('}, ', '},\n' + ' ' * 24),
                       'odata_properties': str(odata_properties).replace(', ', ',\n' + ' ' * 30),
                       'attributes': attributes,
-                      'license': '"""License"""'}
+                      'module_docstring': MODULE_DOCSTRING}
 
         self.classes[name] = Template(str_class).substitute(dic_values)
 
@@ -303,7 +307,7 @@ class $class_name($base_class_name):
 
             attributes += " \\\n            if '" + p_name + "' in properties and properties['" + p_name + "'] is not None else None\n"
 
-        str_class = '''$license
+        str_class = '''$module_docstring
 $imports
 
 class $class_name($base_class_name):
@@ -341,13 +345,17 @@ class $class_name($base_class_name):
                       'python_properties': str(schema.properties).replace('}, ', '},\n' + ' ' * 24),
                       'odata_properties': str(odata_properties).replace(', ', ',\n' + ' ' * 30),
                       'attributes': attributes,
-                      'license': '"""License"""'}
+                      'module_docstring': MODULE_DOCSTRING}
 
         self.classes[name] = Template(str_class).substitute(dic_values)
 
     ######################################################################
 
     def save(self, output_loc):
+        """Saves classes into module files
+        :param output_loc: path to directory where files will be saved
+        """
+        # string containing imports to all classes
         str_package = ""
 
         # object classes files

@@ -17,16 +17,21 @@ CONSOLE_LOG_LEVEL = logging.DEBUG
 
 def main():
 
+    # Clear log file
     try:
         os.remove(TEMP_LOCATION + LOG_FILENAME)
     except FileNotFoundError:
         pass
 
+    # Console logging
     logging.basicConfig(format="%(levelname)s %(message)s", level=CONSOLE_LOG_LEVEL)
+
+    # File logging
     file_log = logging.FileHandler(filename=TEMP_LOCATION + LOG_FILENAME)
     file_log.setLevel(logging.INFO)
     file_log.setFormatter(logging.Formatter("%(asctime)-15s %(levelname)s %(message)s"))
     logging.getLogger('').addHandler(file_log)
+
     logging.debug("Start")
 
     graph_model = omodeler.ClassFactory(METADATA_URL, CLASS_PREFIX, INPUT_LOCATION, TEMP_LOCATION)

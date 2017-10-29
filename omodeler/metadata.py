@@ -2,6 +2,8 @@ import xml.etree.ElementTree as ET
 import logging
 from keyword import iskeyword
 
+XMLNS = "{http://docs.oasis-open.org/odata/ns/edm}"
+
 
 class OdataFunction(dict):
     def __init__(self,
@@ -208,7 +210,6 @@ class Metadata(object):
     def __init__(self, metadata_file, class_prefix):
 
         # variables
-        self._xmlns = '{http://docs.oasis-open.org/odata/ns/edm}'
         self._namespace = ''
         self.class_prefix = class_prefix
         self.sets = {}
@@ -235,7 +236,7 @@ class Metadata(object):
         def add_xmlns_to_tag(tag):
             """Return tag in XML namespace format: {http://url}tag
             """
-            return self._xmlns + tag
+            return XMLNS + tag
 
         def add_namespace_to_tag(tag):
             """Return tag with in namespace format. 
